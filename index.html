@@ -350,6 +350,9 @@ ${x.remarks?`<p>${esc(x.remarks)}</p>`:''}
 <div class="actions">
 <button onclick="editItem('${x.id}')">Edit</button>
 <button onclick="deleteItem('${x.id}')">Delete</button>
+<button onclick="viewDetails('${x.id}')">
+  View details
+</button>
 </div></div></div>`;
 }
 
@@ -489,6 +492,132 @@ navigator.serviceWorker.register('./sw.js').catch(console.error);
 }
 await render();
 })();
+
+  
+async function viewDetails(id) {
+  let allItems = await all();
+  let selected = allItems.find(x => x.id === id);
+
+  if (!selected) return;
+
+  let history = allItems
+    .filter(x => x.name.toLowerCase().trim() ===
+      selected.name.toLowerCase().trim())
+    .sort((a,b) => a.date.localeCompare(b.date));
+
+  let prices = history.map(x => x.price);
+  let total = prices.reduce((a,b) => a+b, 0);
+
+  $('detailName').textContent = selected.name;
+  $('itemSpent').textContent = '₹' + total.toFixed(2);
+  $('itemCount').textContent = history.length;
+  $('itemAverage').textContent =
+    '₹' + (total/history.length).toFixed(2);
+  $('itemLatest').textContent =
+    '₹' + history[history.length-1].price.toFixed(2);
+  $('itemLowest').textContent =
+    '₹' + Math.min(...prices).toFixed(2);
+  $('itemHighest').textContent =
+    '₹' + Math.max(...prices).toFixed(2);
+
+  $('itemHistory').innerHTML =
+    [...history].reverse().map(itemHTML).join('');
+
+  drawPriceChart(history);
+
+  document.querySelectorAll('main section')
+    .forEach(s => s.classList.add('hidden'));
+
+  $('details').classList.remove('hidden');
+
+  document.querySelectorAll('nav button')
+    .forEach(b => b.classList.remove('active'));
+}
+
+function drawPriceChart(history) {
+  let canvas = $('priceChart');
+  let ctx = canvas.getContext('2d');
+
+  let width = canvas.clientWidth;
+  let height = 220;
+  let dpr = window.devicePixelRatio || 1;
+
+  canvas.width = width * dpr;
+  canvas.height = height * dpr;
+
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,width,height);
+
+  if (!history.length) return;
+
+  let prices = history.map(x => x.price);
+  let max = Math.max(...prices);
+  let min = Math.min(...prices);
+
+  let range = max-min || 1;
+  let left = 42;
+  let right = width-15;
+  let top = 25;
+  let bottom = height-35;
+
+  ctx.font = '11px Arial';
+  ctx.fillStyle = '#65716a';
+
+  for (let i=0;i<5;i++) {
+    let y = top+i*(bottom-top)/4;
+    let value = max-i*(max-min)/4;
+
+    ctx.fillText('₹'+value.toFixed(0),2,y+4);
+
+    ctx.strokeStyle = '#e7eee9';
+    ctx.beginPath();
+    ctx.moveTo(left,y);
+    ctx.lineTo(right,y);
+    ctx.stroke();
+  }
+
+  ctx.beginPath();
+
+  history.forEach((item,i) => {
+    let x = history.length===1
+      ? (left+right)/2
+      : left+i*(right-left)/(history.length-1);
+
+    let y = bottom-(item.price-min)/range*
+      (bottom-top);
+
+    if (i===0) ctx.moveTo(x,y);
+    else ctx.lineTo(x,y);
+  });
+
+  ctx.strokeStyle = '#16845b';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  history.forEach((item,i) => {
+    let x = history.length===1
+      ? (left+right)/2
+      : left+i*(right-left)/(history.length-1);
+
+    let y = bottom-(item.price-min)/range*
+      (bottom-top);
+
+    ctx.fillStyle = '#16845b';
+    ctx.beginPath();
+    ctx.arc(x,y,4,0,Math.PI*2);
+    ctx.fill();
+
+    if (history.length<=8) {
+      ctx.fillStyle = '#333';
+      ctx.fillText(
+        item.date.slice(5),
+        Math.max(left,x-15),
+        height-12
+      );
+    }
+  });
+}
+
 </script>
 </body>
 </html>
