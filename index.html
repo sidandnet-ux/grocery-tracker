@@ -332,6 +332,7 @@ document.querySelectorAll('nav button')
 .forEach(b=>b.classList.remove('active'));
 btn.classList.add('active');
 if(id==='home'||id==='history')render();
+  if(id === 'report') renderReport();
 }
 
 function resetForm(){
@@ -704,6 +705,8 @@ async function renderReport() {
   $('reportCount').textContent = records.length;
   $('reportAverage').textContent =
     money(records.length ? total/records.length : 0);
+  $('reportMonth').value =
+  new Date().toISOString().slice(0,7);
 
   let categories = {};
 
