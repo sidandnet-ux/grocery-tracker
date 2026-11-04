@@ -1,0 +1,443 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#16845b">
+<title>My Grocery Tracker</title>
+<link rel="manifest" href="manifest.json">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f3f6f4;color:#202b25;
+font-family:Arial,sans-serif}
+header{background:#16845b;color:white;padding:20px}
+header h2{margin:0}
+nav{display:flex;background:white;position:sticky;top:0;
+z-index:5;justify-content:space-around;padding:12px 2px;
+box-shadow:0 2px 5px #ddd}
+nav button{border:0;background:none;color:#555;font-size:12px}
+nav button.active{color:#16845b;font-weight:bold}
+main{max-width:650px;margin:auto;padding:15px}
+.card{background:white;border-radius:14px;padding:16px;
+margin-bottom:14px;box-shadow:0 2px 8px #0000000a}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.stat{background:#e2f4eb;padding:15px;border-radius:12px}
+.stat small{color:#53665b}
+.stat h2{margin:8px 0;color:#16845b}
+input,select,textarea{width:100%;padding:12px;
+border:1px solid #d5ddd8;border-radius:9px;
+margin:6px 0 13px;font-size:15px;background:white}
+label{font-size:13px;font-weight:bold}
+button.primary{background:#16845b;color:white;border:0;
+padding:13px;border-radius:9px;width:100%;font-size:15px}
+button.secondary{background:#e2f4eb;color:#126b49;border:0;
+padding:10px;border-radius:8px}
+.item{display:flex;gap:12px;align-items:center;
+border-bottom:1px solid #eee;padding:12px 0}
+.item img{width:65px;height:65px;object-fit:cover;
+border-radius:9px;background:#eee}
+.item .details{flex:1;min-width:0}
+.item p{margin:4px 0;color:#65716a;font-size:12px}
+.item strong{font-size:15px}
+.hidden{display:none!important}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.actions button{border:0;border-radius:7px;padding:8px}
+#photoPreview{width:100px;height:100px;object-fit:cover;
+display:none;border-radius:10px;margin-bottom:12px}
+h3{margin-top:5px}
+.muted{color:#738078;font-size:13px}
+</style>
+</head>
+<body>
+
+<header>
+<h2>🛒 My Grocery Tracker</h2>
+<p>Track purchases. Compare prices. Save money.</p>
+</header>
+
+<nav>
+<button class="active" onclick="showTab('home',this)">Home</button>
+<button onclick="showTab('add',this)">＋ Add</button>
+<button onclick="showTab('history',this)">History</button>
+<button onclick="showTab('backup',this)">Backup</button>
+</nav>
+
+<main>
+<section id="home">
+<div class="stats">
+<div class="stat"><small>Total spending</small>
+<h2 id="total">₹0</h2></div>
+<div class="stat"><small>Purchases</small>
+<h2 id="count">0</h2></div>
+</div>
+<div class="card">
+<h3>Recently purchased</h3>
+<div id="recent"></div>
+</div>
+<div class="card">
+<h3>Price comparison</h3>
+<p class="muted">See how your latest purchase compares with the previous one.</p>
+<div id="comparisons"></div>
+</div>
+</section>
+
+<section id="add" class="hidden">
+<div class="card">
+<h3 id="formTitle">Add grocery purchase</h3>
+<form id="purchaseForm">
+<input type="hidden" id="editId">
+<label>Item name *</label>
+<input id="name" required placeholder="e.g. Rice, Milk, Oil">
+
+<label>Purchase date *</label>
+<input id="date" type="date" required>
+
+<label>Price (₹) *</label>
+<input id="price" type="number" min="0" step="0.01"
+required placeholder="Total amount paid">
+
+<label>Quantity *</label>
+<input id="quantity" type="number" min="0.001"
+step="any" required placeholder="e.g. 5">
+
+<label>Unit</label>
+<select id="unit">
+<option>kg</option><option>g</option>
+<option>litre</option><option>ml</option>
+<option>packet</option><option>piece</option>
+<option>dozen</option><option>box</option>
+<option>other</option>
+</select>
+
+<label>Remarks</label>
+<textarea id="remarks" rows="3"
+placeholder="Brand, shop, quality, etc."></textarea>
+
+<label>Item photograph</label>
+<input id="photo" type="file" accept="image/*"
+capture="environment">
+<img id="photoPreview" alt="Preview">
+
+<button class="primary" type="submit">Save purchase</button>
+<button type="button" class="secondary" style="width:100%;margin-top:8px"
+onclick="resetForm()">Clear form</button>
+</form>
+</div>
+</section>
+
+<section id="history" class="hidden">
+<div class="card">
+<h3>Purchase history</h3>
+<input id="search" placeholder="Search grocery items..."
+oninput="render()">
+<label>Filter by date</label>
+<input type="month" id="month" oninput="render()">
+<div id="records"></div>
+</div>
+</section>
+
+<section id="backup" class="hidden">
+<div class="card">
+<h3>Data backup & restore</h3>
+<p class="muted">Export all purchases, including item photographs,
+into one JSON backup file.</p>
+<button class="primary" onclick="exportData()">⬇ Export backup</button>
+<hr>
+<h3>Restore backup</h3>
+<p class="muted">Import a previously exported JSON file.
+You can choose to replace or merge your existing records.</p>
+<input type="file" id="importFile" accept=".json,application/json">
+<button class="primary" onclick="importData('merge')">
+Import and merge
+</button>
+<button class="secondary" style="width:100%;margin-top:10px"
+onclick="importData('replace')">
+Replace all existing data
+</button>
+<p class="muted">Keep backup files somewhere safe. Replacing data
+will delete existing records.</p>
+</div>
+<div class="card">
+<h3>Storage information</h3>
+<p class="muted">Your data is stored locally in this browser using
+IndexedDB. Clearing browser data can erase your records.</p>
+</div>
+</section>
+</main>
+
+<script>
+const DB='GroceryTrackerDB';
+const STORE='purchases';
+let db;
+let currentPhoto=null;
+
+const $=id=>document.getElementById(id);
+
+function openDB(){
+return new Promise((resolve,reject)=>{
+let req=indexedDB.open(DB,1);
+req.onupgradeneeded=()=>{
+req.result.createObjectStore(STORE,{keyPath:'id'});
+};
+req.onsuccess=()=>{db=req.result;resolve(db)};
+req.onerror=()=>reject(req.error);
+});
+}
+
+function all(){
+return new Promise((resolve,reject)=>{
+let req=db.transaction(STORE).objectStore(STORE).getAll();
+req.onsuccess=()=>resolve(req.result);
+req.onerror=()=>reject(req.error);
+});
+}
+
+function save(record){
+return new Promise((resolve,reject)=>{
+let tx=db.transaction(STORE,'readwrite');
+tx.objectStore(STORE).put(record);
+tx.oncomplete=resolve;
+tx.onerror=()=>reject(tx.error);
+});
+}
+
+function remove(id){
+return new Promise((resolve,reject)=>{
+let tx=db.transaction(STORE,'readwrite');
+tx.objectStore(STORE).delete(id);
+tx.oncomplete=resolve;
+tx.onerror=()=>reject(tx.error);
+});
+}
+
+function showTab(id,btn){
+document.querySelectorAll('main section')
+.forEach(s=>s.classList.add('hidden'));
+$(id).classList.remove('hidden');
+document.querySelectorAll('nav button')
+.forEach(b=>b.classList.remove('active'));
+btn.classList.add('active');
+if(id==='home'||id==='history')render();
+}
+
+function resetForm(){
+$('purchaseForm').reset();
+$('editId').value='';
+$('formTitle').textContent='Add grocery purchase';
+$('photoPreview').style.display='none';
+currentPhoto=null;
+$('date').value=new Date().toISOString().slice(0,10);
+}
+
+$('photo').addEventListener('change',e=>{
+let file=e.target.files[0];
+if(!file)return;
+if(!file.type.startsWith('image/')){
+alert('Please select an image.');
+return;
+}
+if(file.size>10*1024*1024){
+alert('Please choose an image smaller than 10 MB.');
+e.target.value='';
+return;
+}
+let reader=new FileReader();
+reader.onload=()=>{
+currentPhoto=reader.result;
+$('photoPreview').src=currentPhoto;
+$('photoPreview').style.display='block';
+};
+reader.readAsDataURL(file);
+});
+
+$('purchaseForm').addEventListener('submit',async e=>{
+e.preventDefault();
+
+let id=$('editId').value;
+let old=id?(await all()).find(x=>x.id===id):null;
+
+let record={
+id:id||crypto.randomUUID(),
+name:$('name').value.trim(),
+date:$('date').value,
+price:Number($('price').value),
+quantity:Number($('quantity').value),
+unit:$('unit').value,
+remarks:$('remarks').value.trim(),
+photo:currentPhoto??old?.photo??null
+};
+
+if(!record.name||!record.date||record.price<0||
+record.quantity<=0){
+alert('Please check the purchase details.');
+return;
+}
+
+await save(record);
+resetForm();
+render();
+showTab('history',document.querySelectorAll('nav button')[2]);
+});
+
+function esc(s){
+return String(s??'').replace(/[&<>"']/g,c=>({
+'&':'&amp;','<':'&lt;','>':'&gt;',
+'"':'&quot;',"'":'&#39;'
+}[c]));
+}
+
+function itemHTML(x){
+return `<div class="item">
+${x.photo?`<img src="${x.photo}" alt="">`:
+'<div style="width:65px;height:65px;background:#e2f4eb;border-radius:9px"></div>'}
+<div class="details">
+<strong>${esc(x.name)}</strong>
+<p>${esc(x.date)} · ${x.quantity} ${esc(x.unit)}</p>
+<strong>₹${x.price.toFixed(2)}</strong>
+${x.remarks?`<p>${esc(x.remarks)}</p>`:''}
+<div class="actions">
+<button onclick="editItem('${x.id}')">Edit</button>
+<button onclick="deleteItem('${x.id}')">Delete</button>
+</div></div></div>`;
+}
+
+async function render(){
+let data=await all();
+data.sort((a,b)=>b.date.localeCompare(a.date));
+let total=data.reduce((s,x)=>s+x.price,0);
+$('total').textContent='₹'+total.toFixed(2);
+$('count').textContent=data.length;
+
+$('recent').innerHTML=data.slice(0,5).map(itemHTML).join('')
+||'<p class="muted">No purchases yet.</p>';
+
+let q=$('search').value.toLowerCase();
+let m=$('month').value;
+let filtered=data.filter(x=>
+x.name.toLowerCase().includes(q)&&
+(!m||x.date.startsWith(m))
+);
+$('records').innerHTML=filtered.map(itemHTML).join('')
+||'<p class="muted">No matching purchases.</p>';
+
+let groups={};
+data.forEach(x=>{
+let k=x.name.toLowerCase().trim();
+(groups[k]??=[]).push(x);
+});
+let comparisons=Object.values(groups).filter(g=>g.length>=2)
+.map(g=>{
+let latest=g[0],previous=g[1];
+let diff=latest.price-previous.price;
+return `<div class="item"><div class="details">
+<strong>${esc(latest.name)}</strong>
+<p>Previous: ₹${previous.price.toFixed(2)}
+(${previous.date})</p>
+<p>Latest: ₹${latest.price.toFixed(2)}
+(${latest.date})</p>
+<strong style="color:${diff>0?'#c04444':'#16845b'}">
+${diff>0?'+':''}₹${diff.toFixed(2)}
+</strong></div></div>`;
+});
+$('comparisons').innerHTML=comparisons.join('')
+||'<p class="muted">Add an item more than once to compare prices.</p>';
+}
+
+async function editItem(id){
+let x=(await all()).find(r=>r.id===id);
+if(!x)return;
+$('editId').value=x.id;
+$('name').value=x.name;
+$('date').value=x.date;
+$('price').value=x.price;
+$('quantity').value=x.quantity;
+$('unit').value=x.unit;
+$('remarks').value=x.remarks||'';
+currentPhoto=x.photo;
+if(x.photo){
+$('photoPreview').src=x.photo;
+$('photoPreview').style.display='block';
+}else $('photoPreview').style.display='none';
+$('formTitle').textContent='Edit purchase';
+showTab('add',document.querySelectorAll('nav button')[1]);
+}
+
+async function deleteItem(id){
+if(confirm('Delete this purchase?')){
+await remove(id);
+render();
+}
+}
+
+async function exportData(){
+let data=await all();
+let backup={
+app:'My Grocery Tracker',
+version:1,
+exportedAt:new Date().toISOString(),
+purchases:data
+};
+let blob=new Blob([JSON.stringify(backup,null,2)],
+{type:'application/json'});
+let url=URL.createObjectURL(blob);
+let a=document.createElement('a');
+a.href=url;
+a.download='grocery-backup-'+new Date().toISOString()
+.slice(0,10)+'.json';
+a.click();
+URL.revokeObjectURL(url);
+}
+
+async function importData(mode){
+let file=$('importFile').files[0];
+if(!file){alert('Select a backup file first.');return;}
+if(mode==='replace'&&!confirm(
+'This will permanently replace your existing purchases. Continue?'
+))return;
+if(mode==='merge'&&!confirm('Merge imported records?'))return;
+
+try{
+let backup=JSON.parse(await file.text());
+if(backup.app!=='My Grocery Tracker'||
+backup.version!==1||!Array.isArray(backup.purchases))
+throw Error('Invalid backup file');
+
+let existing=mode==='merge'?await all():[];
+let map=new Map(existing.map(x=>[x.id,x]));
+
+for(let x of backup.purchases){
+if(!x.id||typeof x.name!=='string'||
+!Number.isFinite(x.price)||!Number.isFinite(x.quantity)||
+x.price<0||x.quantity<=0||
+!/^\d{4}-\d{2}-\d{2}$/.test(x.date))
+throw Error('Invalid purchase record in backup');
+map.set(x.id,x);
+}
+let tx=db.transaction(STORE,'readwrite');
+let store=tx.objectStore(STORE);
+store.clear();
+for(let x of map.values())store.put(x);
+await new Promise((resolve,reject)=>{
+tx.oncomplete=resolve;
+tx.onerror=()=>reject(tx.error);
+});
+$('importFile').value='';
+await render();
+alert('Backup imported successfully!');
+}catch(e){
+alert('Import failed: '+e.message);
+}
+}
+
+(async()=>{
+await openDB();
+resetForm();
+if('serviceWorker' in navigator){
+navigator.serviceWorker.register('./sw.js').catch(console.error);
+}
+await render();
+})();
+</script>
+</body>
+</html>
